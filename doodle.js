@@ -24,7 +24,7 @@ var doodle = (function() {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.objects = [];
-        this.restart_timeout = 500;
+        this.restart_timeout = 800;
         this.paused = false;
         this.destroyed = false;
         return this;
@@ -122,9 +122,35 @@ var doodle = (function() {
         var canvasWidth = stage.ctx.canvas.width;
         var canvasHeight = stage.ctx.canvas.height;
 
-        // Fixed to make planes cross completely from left to right across the full screen
-        var init_x = -100;
-        var init_y = Math.random() * (canvasHeight * 0.7) + (canvasHeight * 0.15);
+        // বিভিন্ন দিক থেকে প্লেন আসার জন্য র‍্যান্ডম রুট প্যাটার্ন (০ থেকে ৩ পর্যন্ত ৪টি ডিরেকশন)
+        var directionType = Math.floor(Math.random() * 4);
+        var init_x, init_y, target_x, target_y;
+
+        if (directionType === 0) {
+            // ১. বাম দিক থেকে ডান দিকে
+            init_x = -100;
+            init_y = Math.random() * (canvasHeight * 0.7) + (canvasHeight * 0.15);
+            target_x = canvasWidth + 200;
+            target_y = init_y + (Math.random() * 200 - 100);
+        } else if (directionType === 1) {
+            // ২. ডান দিক থেকে বাম দিকে
+            init_x = canvasWidth + 100;
+            init_y = Math.random() * (canvasHeight * 0.7) + (canvasHeight * 0.15);
+            target_x = -200;
+            target_y = init_y + (Math.random() * 200 - 100);
+        } else if (directionType === 2) {
+            // ৩. নিচ থেকে ওপরের দিকে
+            init_x = Math.random() * (canvasWidth * 0.7) + (canvasWidth * 0.15);
+            init_y = canvasHeight + 100;
+            target_x = init_x + (Math.random() * 200 - 100);
+            target_y = -200;
+        } else {
+            // ৪. কোণাকুণি (উপরের বাম কোণ থেকে নিচের ডান কোণ)
+            init_x = -100;
+            init_y = -100;
+            target_x = canvasWidth + 200;
+            target_y = canvasHeight + 200;
+        }
 
         _l("starting from:" + init_x + " ," + init_y);
         var formation = new Formation(init_x, init_y);
@@ -136,10 +162,9 @@ var doodle = (function() {
         formation.addPlane(80, -30, "0, 128, 0");
         formation.addPlane(100, 0, "0, 128, 0");
 
-        var target_x = canvasWidth + 200;
-        var target_y = init_y + (Math.random() * 200 - 100);
-
-        formation.travelTo(target_x, target_y, 4 + 2 * Math.random());
+        var dx = target_x - init_x;
+        var dy = target_y - init_y;
+        formation.travelTo(dx, dy, 3.5 + 2 * Math.random());
         return formation;
     };
 
@@ -158,7 +183,7 @@ var doodle = (function() {
 
     JetPlane.prototype.draw = function (ctx) {
         ctx.save();
-        var angle = Math.atan(this.pather.slope) + PI_half;
+        var angle = Math.atan2(this.pather.delta_y, this.pather.delta_x) + PI_half;
         ctx.translate(this.x, this.y);
         ctx.rotate(angle)
 
@@ -176,16 +201,17 @@ var doodle = (function() {
     }
 
     JetPlane.prototype.travelTo = function(_x, _y, v) {
-        this.pather.createPath(this.x, this.y, _x, _y, v);
+        this.pather.createPath(this.x, this.y, this.x + _x, this.y + _y, v);
     }
 
     JetPlane.prototype.tick = function(ctx) {
         this.pather.move();
-        var angle = Math.atan(this.pather.slope) + PI_half;
+        var angle = Math.atan2(this.pather.delta_y, this.pather.delta_x) + PI_half;
         var adj_x = - this.formation_x + this.formation_x * Math.cos(angle) - this.formation_y * Math.sin(angle);
         var adj_y = - this.formation_y + this.formation_x * Math.sin(angle) + this.formation_y * Math.cos(angle);
         this.x = this.pather.x + adj_x;
         this.y = this.pather.y + adj_y;
+        
         if (this.smoke_particles_list.length < 100 && !this.destroy_plane) {
             var delta_x = (11 + 2 * Math.random()) * Math.cos(angle) - (29 + 4 * Math.random()) * Math.sin(angle);
             var delta_y = (11 + 2 * Math.random()) * Math.sin(angle) + (29 + 4 * Math.random()) * Math.cos(angle);
@@ -194,7 +220,7 @@ var doodle = (function() {
         }
         this.draw(ctx);
 
-        var bbw = 150; //bounding box width expanded to ensure full crossing
+        var bbw = 250; // bounding box width expanded for safe screen clearing
         if (this.x > ctx.canvas.width + bbw || this.y > ctx.canvas.height + bbw || this.x < 0 - bbw || this.y < 0 - bbw) {
             this.destroy_plane = true;
         } else {
@@ -214,20 +240,30 @@ var doodle = (function() {
 
     var PathMaker = function() {
         this.speed = 2.5;
-        this.slope = null
         this.x = 0;
         this.y = 0;
         this.delta_x = 0;
         this.delta_y = 0;
+        this.distance = 0;
+        this.traveled = 0;
+        this.x1 = 0;
+        this.y1 = 0;
+        this.x2 = 0;
+        this.y2 = 0;
     };
 
     PathMaker.prototype.createPath = function(x1, y1, x2, y2, v) {
+        this.x1 = x1;
+        this.y1 = y1;
+        this.x2 = x2;
+        this.y2 = y2;
         this.x = x1;
         this.y = y1;
         this.delta_x = x2 - x1;
         this.delta_y = y2 - y1;
-        this.slope = this.delta_y / this.delta_x;
+        this.distance = Math.sqrt(this.delta_x * this.delta_x + this.delta_y * this.delta_y);
         this.speed = v;
+        this.traveled = 0;
     }
 
     PathMaker.prototype.setSpeed = function (v) {
@@ -235,8 +271,13 @@ var doodle = (function() {
     }
 
     PathMaker.prototype.move = function () {
-        this.x = this.x + Math.cos(Math.atan(this.slope)) * this.speed;
-        this.y = this.y + Math.sin(Math.atan(this.slope)) * this.speed;
+        if (this.distance > 0) {
+            this.traveled += this.speed;
+            var ratio = this.traveled / this.distance;
+            if (ratio > 1) ratio = 1;
+            this.x = this.x1 + this.delta_x * ratio;
+            this.y = this.y1 + this.delta_y * ratio;
+        }
     }
 
 
