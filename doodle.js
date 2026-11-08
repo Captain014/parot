@@ -24,7 +24,7 @@ var doodle = (function() {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.objects = [];
-        this.restart_timeout = 1000;
+        this.restart_timeout = 500;
         this.paused = false;
         this.destroyed = false;
         return this;
@@ -32,17 +32,12 @@ var doodle = (function() {
 
     var fps = 0, now, lastUpdate = (new Date) * 1 - 1;
 
-    // The higher this value, the less the FPS will be affected by quick changes
-    // Setting this to 1 will show you the FPS of the last sampled frame only
     var fpsFilter = 50;
     var set_fps = function() {
         var thisFrameFPS = 1000 / ((now = new Date) - lastUpdate);
         fps += (thisFrameFPS - fps) / fpsFilter;
         lastUpdate = now;
     }
-    //setInterval(function(){
-    // _l(fps.toFixed(1) + "fps");
-    //}, 1000);
 
 
     Stage.prototype.frame = function() {
@@ -50,12 +45,8 @@ var doodle = (function() {
             return;
         }
 
-        //set_fps();
-
-        //clear the stage(canvas);
         this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height)
 
-        //call tick on all the objects on stage
         for (var i in this.objects) {
             if (this.objects[i].destroyed == true) {
                 this.objects.splice(i, 1)
@@ -72,16 +63,13 @@ var doodle = (function() {
                 self.frame();
             }, this.restart_timeout);
         } else if (!this.paused) {
-            //recursivily call itself
             requestAnimationFrame(this.frame.bind(this))
         }
 
     };
 
     Stage.prototype.setup = function() {
-
         this.objects.push(getRandomFormation(this));
-
     };
 
     Stage.prototype.destroy = function() {
@@ -131,24 +119,27 @@ var doodle = (function() {
     };
 
     var getRandomFormation = function(stage) {
-        var y_to_zero = Math.random() > 0.5 ? true : false
-        var init_y = y_to_zero ? stage.ctx.canvas.height : 10 + (stage.ctx.canvas.height - 10) * Math.random();
-        var init_x = y_to_zero ? (stage.ctx.canvas.width / 2 - 10) * Math.random() : 10;
+        var canvasWidth = stage.ctx.canvas.width;
+        var canvasHeight = stage.ctx.canvas.height;
+
+        // Fixed to make planes cross completely from left to right across the full screen
+        var init_x = -100;
+        var init_y = Math.random() * (canvasHeight * 0.7) + (canvasHeight * 0.15);
 
         _l("starting from:" + init_x + " ," + init_y);
         var formation = new Formation(init_x, init_y);
 
         formation.addPlane(0, -0, "0, 128, 0");
-        formation.addPlane(15, -25, "0, 128, 0");
-        formation.addPlane(30, -50, "255, 0, 0");
-        formation.addPlane(45, -50, "255, 0, 0");
-        formation.addPlane(60, -25, "0, 128, 0");
-        formation.addPlane(75, 0, "0, 128, 0");
+        formation.addPlane(20, -30, "0, 128, 0");
+        formation.addPlane(40, -60, "255, 0, 0");
+        formation.addPlane(60, -60, "255, 0, 0");
+        formation.addPlane(80, -30, "0, 128, 0");
+        formation.addPlane(100, 0, "0, 128, 0");
 
-        var target_y = stage.ctx.canvas.height - init_y;
-        var target_x = stage.ctx.canvas.width - init_x;
+        var target_x = canvasWidth + 200;
+        var target_y = init_y + (Math.random() * 200 - 100);
 
-        formation.travelTo(target_x, target_y, 3 + 3 * Math.random());
+        formation.travelTo(target_x, target_y, 4 + 2 * Math.random());
         return formation;
     };
 
@@ -168,13 +159,10 @@ var doodle = (function() {
     JetPlane.prototype.draw = function (ctx) {
         ctx.save();
         var angle = Math.atan(this.pather.slope) + PI_half;
-        //console.log(angle)
         ctx.translate(this.x, this.y);
-        //ctx.translate(23, 32)
         ctx.rotate(angle)
 
         ctx.drawImage(this.img, 0, 0);
-        //ctx.drawImage(this.img, this.x, this.y);
         ctx.restore();
 
         for (var i in this.smoke_particles_list) {
@@ -192,7 +180,6 @@ var doodle = (function() {
     }
 
     JetPlane.prototype.tick = function(ctx) {
-        //this.x = this.x + 5;
         this.pather.move();
         var angle = Math.atan(this.pather.slope) + PI_half;
         var adj_x = - this.formation_x + this.formation_x * Math.cos(angle) - this.formation_y * Math.sin(angle);
@@ -207,7 +194,7 @@ var doodle = (function() {
         }
         this.draw(ctx);
 
-        var bbw = 50; //bounding box width
+        var bbw = 150; //bounding box width expanded to ensure full crossing
         if (this.x > ctx.canvas.width + bbw || this.y > ctx.canvas.height + bbw || this.x < 0 - bbw || this.y < 0 - bbw) {
             this.destroy_plane = true;
         } else {
@@ -268,8 +255,6 @@ var doodle = (function() {
         ctx.fillStyle = 'rgba(' + this.rgb + ',' + this.opacity + ')';
         ctx.shadowColor = 'rgba(' + this.rgb + ',1)';
 
-        //ctx.shadowBlur = 5;
-
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, true);
         ctx.fill();
 
@@ -278,7 +263,6 @@ var doodle = (function() {
         if (this.opacity <= 0) {
             this.destroyed = true;
         }
-        ;
 
         ctx.restore();
     };
