@@ -26,9 +26,10 @@ var doodle = (function() {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.objects = [];
-        this.restart_timeout = 1000;
+        this.restart_timeout = 800;
         this.paused = false;
         this.destroyed = false;
+        this.waitingRestart = false;
         return this;
     };
 
@@ -40,22 +41,26 @@ var doodle = (function() {
         this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
 
         for (var i = this.objects.length - 1; i >= 0; i--) {
-            if (this.objects[i].destroyed == true) {
+            if (this.objects[i].destroyed === true) {
                 this.objects.splice(i, 1);
             } else {
                 this.objects[i].tick(this.ctx);
             }
         }
 
-        if (this.objects.length == 0) {
-            var self = this;
-            setTimeout(function() {
-                if (!self.destroyed) {
-                    _l("restarting in " + self.restart_timeout);
-                    self.setup();
-                    self.frame();
-                }
-            }, this.restart_timeout);
+        if (this.objects.length === 0) {
+            if (!this.waitingRestart && !this.paused) {
+                var self = this;
+                this.waitingRestart = true;
+                setTimeout(function() {
+                    self.waitingRestart = false;
+                    if (!self.destroyed && !self.paused) {
+                        _l("restarting formation...");
+                        self.setup();
+                        requestAnimationFrame(self.frame.bind(self));
+                    }
+                }, this.restart_timeout);
+            }
         } else if (!this.paused) {
             requestAnimationFrame(this.frame.bind(this));
         }
@@ -74,6 +79,7 @@ var doodle = (function() {
         this.x = x;
         this.y = y;
         this.planes = [];
+        this.destroyed = false;
     };
 
     Formation.prototype.addPlane = function(formation_x, formation_y, color) {
@@ -84,17 +90,16 @@ var doodle = (function() {
         return plane;
     };
 
-    Formation.prototype.travelTo = function(endX, endY, v) {
-        var f_plane;
-        for (var i in this.planes) {
-            f_plane = this.planes[i];
-            f_plane.travelTo(f_plane.formation_x + endX, f_plane.formation_y + endY, v);
+    Formation.prototype.travelTo = function(targetX, targetY, v) {
+        for (var i = 0; i < this.planes.length; i++) {
+            var f_plane = this.planes[i];
+            f_plane.travelTo(targetX + f_plane.formation_x, targetY + f_plane.formation_y, v);
         }
     };
 
     Formation.prototype.tick = function(ctx) {
         for (var i = this.planes.length - 1; i >= 0; i--) {
-            if (this.planes[i].destroyed) {
+            if (this.planes[i].destroyed === true) {
                 _l("deleting plane " + i);
                 this.planes.splice(i, 1);
             } else {
@@ -102,7 +107,7 @@ var doodle = (function() {
             }
         }
 
-        if (this.planes.length == 0) {
+        if (this.planes.length === 0) {
             this.destroy();
         }
     };
@@ -111,50 +116,42 @@ var doodle = (function() {
         this.destroyed = true;
     };
 
-    // বাম -> ডান এবং ওপর -> নিচে মসৃণভাবে যাওয়ার জন্য প্যাটার্ন
+    // শুধু সোজা বাম -> ডান অথবা সোজা ওপর -> নিচে চলবে
     var getRandomFormation = function(stage) {
         var w = stage.ctx.canvas.width;
         var h = stage.ctx.canvas.height;
-        var margin = 80;
+        var margin = 100;
 
-        var init_x, init_y, end_x, end_y;
+        var init_x, init_y, target_x, target_y;
+        var goLeftToRight = Math.random() > 0.5;
 
-        // 0: বাম থেকে ডানে | 1: ওপর থেকে নিচে | 2: বাম-ওপর থেকে ডান-নিচে
-        var mode = Math.floor(Math.random() * 3);
-
-        if (mode === 0) {
-            // Left -> Right
+        if (goLeftToRight) {
+            // Left -> Right (straight horizontal)
             init_x = -margin;
-            init_y = 80 + Math.random() * Math.max(100, h - 160);
-            end_x = w + margin;
-            end_y = init_y + (Math.random() * 140 - 70);
-        } else if (mode === 1) {
-            // Top -> Bottom
-            init_x = 80 + Math.random() * Math.max(100, w - 160);
-            init_y = -margin;
-            end_x = init_x + (Math.random() * 140 - 70);
-            end_y = h + margin;
+            init_y = 100 + Math.random() * Math.max(100, h - 200);
+            target_x = w + margin;
+            target_y = init_y;
         } else {
-            // Top-Left -> Bottom-Right
-            init_x = -margin;
-            init_y = 40 + Math.random() * (h * 0.45);
-            end_x = w + margin;
-            end_y = h * 0.55 + Math.random() * (h * 0.4);
+            // Top -> Bottom (straight vertical)
+            init_x = 100 + Math.random() * Math.max(100, w - 200);
+            init_y = -margin;
+            target_x = init_x;
+            target_y = h + margin;
         }
 
-        _l("mode: " + mode + " | from: (" + init_x + "," + init_y + ") to (" + end_x + "," + end_y + ")");
+        _l((goLeftToRight ? "Left->Right" : "Top->Bottom") + " from (" + init_x + "," + init_y + ") to (" + target_x + "," + target_y + ")");
 
         var formation = new Formation(init_x, init_y);
 
         formation.addPlane(0, 0, "0, 128, 0");
-        formation.addPlane(15, -25, "0, 128, 0");
-        formation.addPlane(30, -50, "255, 0, 0");
-        formation.addPlane(45, -50, "255, 0, 0");
-        formation.addPlane(60, -25, "0, 128, 0");
-        formation.addPlane(75, 0, "0, 128, 0");
+        formation.addPlane(20, -30, "0, 128, 0");
+        formation.addPlane(40, -60, "255, 0, 0");
+        formation.addPlane(60, -60, "255, 0, 0");
+        formation.addPlane(80, -30, "0, 128, 0");
+        formation.addPlane(100, 0, "0, 128, 0");
 
-        var speed = 3 + 2.5 * Math.random();
-        formation.travelTo(end_x, end_y, speed);
+        var speed = 3.5 + 2 * Math.random();
+        formation.travelTo(target_x, target_y, speed);
         return formation;
     };
 
@@ -167,6 +164,7 @@ var doodle = (function() {
         this.smoke_particles_list = [];
         this.smoke_rgb = smoke_rgb;
         this.destroy_plane = false;
+        this.destroyed = false;
         this.pather = new PathMaker();
         return this;
     };
@@ -177,14 +175,13 @@ var doodle = (function() {
         ctx.translate(this.x, this.y);
         ctx.rotate(angle);
 
-        // প্লেনের সেন্টার থেকে আঁকলে ঘোরার সময় ছিটকে যায় না
         var drawW = this.img.width || 32;
         var drawH = this.img.height || 32;
         ctx.drawImage(this.img, -drawW / 2, -drawH / 2);
         ctx.restore();
 
         for (var i = this.smoke_particles_list.length - 1; i >= 0; i--) {
-            if (this.smoke_particles_list[i].destroyed == true) {
+            if (this.smoke_particles_list[i].destroyed === true) {
                 this.smoke_particles_list.splice(i, 1);
             } else {
                 this.smoke_particles_list[i].draw(ctx);
@@ -198,24 +195,19 @@ var doodle = (function() {
 
     JetPlane.prototype.tick = function(ctx) {
         this.pather.move();
-
-        var angle = this.pather.angle + PI_half;
-        var adj_x = -this.formation_x + this.formation_x * Math.cos(angle) - this.formation_y * Math.sin(angle);
-        var adj_y = -this.formation_y + this.formation_x * Math.sin(angle) + this.formation_y * Math.cos(angle);
-
-        this.x = this.pather.x + adj_x;
-        this.y = this.pather.y + adj_y;
+        this.x = this.pather.x;
+        this.y = this.pather.y;
 
         if (this.smoke_particles_list.length < 100 && !this.destroy_plane) {
-            var delta_x = -Math.cos(this.pather.angle) * 18 + (Math.random() * 4 - 2);
-            var delta_y = -Math.sin(this.pather.angle) * 18 + (Math.random() * 4 - 2);
-            var smoke_particle = new SmokeParticle(this.x + delta_x, this.y + delta_y, this.smoke_rgb);
+            var backX = -Math.cos(this.pather.angle) * 16 + (Math.random() * 4 - 2);
+            var backY = -Math.sin(this.pather.angle) * 16 + (Math.random() * 4 - 2);
+            var smoke_particle = new SmokeParticle(this.x + backX, this.y + backY, this.smoke_rgb);
             this.smoke_particles_list.push(smoke_particle);
         }
 
         this.draw(ctx);
 
-        var bbw = 140;
+        var bbw = 160;
         if (
             this.x > ctx.canvas.width + bbw ||
             this.y > ctx.canvas.height + bbw ||
@@ -223,11 +215,9 @@ var doodle = (function() {
             this.y < -bbw
         ) {
             this.destroy_plane = true;
-        } else {
-            this.destroy_plane = false;
         }
 
-        if (this.destroy_plane && this.smoke_particles_list.length == 0) {
+        if (this.destroy_plane && this.smoke_particles_list.length === 0) {
             this.destroy();
         }
     };
@@ -269,6 +259,7 @@ var doodle = (function() {
         this.opacity = 0.5;
         this.radius = 2 + Math.random();
         this.rgb = rgb;
+        this.destroyed = false;
     };
 
     SmokeParticle.prototype.draw = function(ctx) {
