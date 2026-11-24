@@ -16,8 +16,7 @@ var doodle = (function() {
         function(func) {
             setTimeout(func, 17);
         };
-    var
-        PI_half = Math.PI / 2, resources = {};
+    var PI_half = Math.PI / 2, resources = {};
 
 
     var Stage = function(canvas) {
@@ -30,42 +29,32 @@ var doodle = (function() {
         return this;
     };
 
-    var fps = 0, now, lastUpdate = (new Date) * 1 - 1;
-
-    var fpsFilter = 50;
-    var set_fps = function() {
-        var thisFrameFPS = 1000 / ((now = new Date) - lastUpdate);
-        fps += (thisFrameFPS - fps) / fpsFilter;
-        lastUpdate = now;
-    }
-
-
     Stage.prototype.frame = function() {
         if (this.destroyed) {
             return;
         }
 
-        this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height)
+        this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
 
-        for (var i in this.objects) {
-            if (this.objects[i].destroyed == true) {
-                this.objects.splice(i, 1)
+        // পেছন থেকে লুপ চালাও যাতে splice নিরাপদ হয়
+        for (var i = this.objects.length - 1; i >= 0; i--) {
+            if (this.objects[i].destroyed === true) {
+                this.objects.splice(i, 1);
             } else {
-                this.objects[i].tick(this.ctx)
+                this.objects[i].tick(this.ctx);
             }
         }
 
-        if (this.objects.length == 0) {
-            var self = this
+        if (this.objects.length === 0) {
+            var self = this;
             setTimeout(function() {
-                _l("restarting in " + self.restart_timeout)
+                _l("restarting in " + self.restart_timeout);
                 self.setup();
                 self.frame();
             }, this.restart_timeout);
         } else if (!this.paused) {
-            requestAnimationFrame(this.frame.bind(this))
+            requestAnimationFrame(this.frame.bind(this));
         }
-
     };
 
     Stage.prototype.setup = function() {
@@ -92,24 +81,24 @@ var doodle = (function() {
 
     Formation.prototype.travelTo = function(x, y, v) {
         var f_plane;
-        for (var i in this.planes) {
+        for (var i = 0; i < this.planes.length; i++) {
             f_plane = this.planes[i];
-            f_plane.travelTo(f_plane.formation_x + x, f_plane.formation_y + y, v)
+            f_plane.travelTo(f_plane.formation_x + x, f_plane.formation_y + y, v);
         }
     };
 
     Formation.prototype.tick = function(ctx) {
-
-        for (var i in this.planes) {
+        // পেছন থেকে লুপ
+        for (var i = this.planes.length - 1; i >= 0; i--) {
             if (this.planes[i].destroyed) {
-                _l("deleting plane " + i)
+                _l("deleting plane " + i);
                 this.planes.splice(i, 1);
             } else {
                 this.planes[i].tick(ctx);
             }
         }
 
-        if (this.planes.length == 0) {
+        if (this.planes.length === 0) {
             this.destroy();
         }
     };
@@ -122,30 +111,29 @@ var doodle = (function() {
         var canvasWidth = stage.ctx.canvas.width;
         var canvasHeight = stage.ctx.canvas.height;
 
-        // বিভিন্ন দিক থেকে প্লেন আসার জন্য র‍্যান্ডম রুট প্যাটার্ন (০ থেকে ৩ পর্যন্ত ৪টি ডিরেকশন)
         var directionType = Math.floor(Math.random() * 4);
         var init_x, init_y, target_x, target_y;
 
         if (directionType === 0) {
-            // ১. বাম দিক থেকে ডান দিকে
+            // বাম → ডান
             init_x = -100;
             init_y = Math.random() * (canvasHeight * 0.7) + (canvasHeight * 0.15);
             target_x = canvasWidth + 200;
             target_y = init_y + (Math.random() * 200 - 100);
         } else if (directionType === 1) {
-            // ২. ডান দিক থেকে বাম দিকে
+            // ডান → বাম
             init_x = canvasWidth + 100;
             init_y = Math.random() * (canvasHeight * 0.7) + (canvasHeight * 0.15);
             target_x = -200;
             target_y = init_y + (Math.random() * 200 - 100);
         } else if (directionType === 2) {
-            // ৩. নিচ থেকে ওপরের দিকে
+            // নিচ → উপর
             init_x = Math.random() * (canvasWidth * 0.7) + (canvasWidth * 0.15);
             init_y = canvasHeight + 100;
             target_x = init_x + (Math.random() * 200 - 100);
             target_y = -200;
         } else {
-            // ৪. কোণাকুণি (উপরের বাম কোণ থেকে নিচের ডান কোণ)
+            // তির্যক (উপর-বাম → নিচ-ডান)
             init_x = -100;
             init_y = -100;
             target_x = canvasWidth + 200;
@@ -155,7 +143,7 @@ var doodle = (function() {
         _l("starting from:" + init_x + " ," + init_y);
         var formation = new Formation(init_x, init_y);
 
-        formation.addPlane(0, -0, "0, 128, 0");
+        formation.addPlane(0, 0, "0, 128, 0");
         formation.addPlane(20, -30, "0, 128, 0");
         formation.addPlane(40, -60, "255, 0, 0");
         formation.addPlane(60, -60, "255, 0, 0");
@@ -169,11 +157,11 @@ var doodle = (function() {
     };
 
     var JetPlane = function(img, initX, initY, smoke_rgb, formation_x, formation_y) {
-        this.img = img
+        this.img = img;
         this.x = initX;
         this.y = initY;
         this.formation_x = formation_x;
-        this.formation_y = formation_y
+        this.formation_y = formation_y;
         this.smoke_particles_list = [];
         this.smoke_rgb = smoke_rgb;
         this.destroy_plane = false;
@@ -181,61 +169,67 @@ var doodle = (function() {
         return this;
     };
 
-    JetPlane.prototype.draw = function (ctx) {
+    JetPlane.prototype.draw = function(ctx) {
         ctx.save();
         var angle = Math.atan2(this.pather.delta_y, this.pather.delta_x) + PI_half;
         ctx.translate(this.x, this.y);
-        ctx.rotate(angle)
+        ctx.rotate(angle);
 
         ctx.drawImage(this.img, 0, 0);
         ctx.restore();
 
-        for (var i in this.smoke_particles_list) {
-            if (this.smoke_particles_list[i].destroyed == true) {
+        // স্মোক পার্টিকেলও পেছন থেকে ক্লিন করো
+        for (var i = this.smoke_particles_list.length - 1; i >= 0; i--) {
+            if (this.smoke_particles_list[i].destroyed === true) {
                 this.smoke_particles_list.splice(i, 1);
             } else {
                 this.smoke_particles_list[i].draw(ctx);
             }
         }
-
-    }
+    };
 
     JetPlane.prototype.travelTo = function(_x, _y, v) {
         this.pather.createPath(this.x, this.y, this.x + _x, this.y + _y, v);
-    }
+    };
 
     JetPlane.prototype.tick = function(ctx) {
         this.pather.move();
+
         var angle = Math.atan2(this.pather.delta_y, this.pather.delta_x) + PI_half;
-        var adj_x = - this.formation_x + this.formation_x * Math.cos(angle) - this.formation_y * Math.sin(angle);
-        var adj_y = - this.formation_y + this.formation_x * Math.sin(angle) + this.formation_y * Math.cos(angle);
+
+        // ঠিক করা formation রোটেশন (আগের ভুল -formation_x/-formation_y বাদ)
+        var cosA = Math.cos(angle);
+        var sinA = Math.sin(angle);
+        var adj_x = this.formation_x * cosA - this.formation_y * sinA;
+        var adj_y = this.formation_x * sinA + this.formation_y * cosA;
+
         this.x = this.pather.x + adj_x;
         this.y = this.pather.y + adj_y;
-        
+
         if (this.smoke_particles_list.length < 100 && !this.destroy_plane) {
-            var delta_x = (11 + 2 * Math.random()) * Math.cos(angle) - (29 + 4 * Math.random()) * Math.sin(angle);
-            var delta_y = (11 + 2 * Math.random()) * Math.sin(angle) + (29 + 4 * Math.random()) * Math.cos(angle);
-            var smoke_particle = new SmokeParticle(this.x + delta_x, this.y + delta_y, this.smoke_rgb)
+            var delta_x = (11 + 2 * Math.random()) * cosA - (29 + 4 * Math.random()) * sinA;
+            var delta_y = (11 + 2 * Math.random()) * sinA + (29 + 4 * Math.random()) * cosA;
+            var smoke_particle = new SmokeParticle(this.x + delta_x, this.y + delta_y, this.smoke_rgb);
             this.smoke_particles_list.push(smoke_particle);
         }
+
         this.draw(ctx);
 
-        var bbw = 250; // bounding box width expanded for safe screen clearing
+        var bbw = 250;
         if (this.x > ctx.canvas.width + bbw || this.y > ctx.canvas.height + bbw || this.x < 0 - bbw || this.y < 0 - bbw) {
             this.destroy_plane = true;
         } else {
             this.destroy_plane = false;
         }
 
-        if (this.destroy_plane && this.smoke_particles_list.length == 0) {
-            this.destroy()
+        if (this.destroy_plane && this.smoke_particles_list.length === 0) {
+            this.destroy();
         }
-
     };
 
     JetPlane.prototype.destroy = function() {
         this.destroyed = true;
-    }
+    };
 
 
     var PathMaker = function() {
@@ -264,13 +258,13 @@ var doodle = (function() {
         this.distance = Math.sqrt(this.delta_x * this.delta_x + this.delta_y * this.delta_y);
         this.speed = v;
         this.traveled = 0;
-    }
+    };
 
-    PathMaker.prototype.setSpeed = function (v) {
+    PathMaker.prototype.setSpeed = function(v) {
         this.speed = v;
-    }
+    };
 
-    PathMaker.prototype.move = function () {
+    PathMaker.prototype.move = function() {
         if (this.distance > 0) {
             this.traveled += this.speed;
             var ratio = this.traveled / this.distance;
@@ -278,13 +272,13 @@ var doodle = (function() {
             this.x = this.x1 + this.delta_x * ratio;
             this.y = this.y1 + this.delta_y * ratio;
         }
-    }
+    };
 
 
-    var SmokeParticle = function (paramX, paramY, rgb) {
+    var SmokeParticle = function(paramX, paramY, rgb) {
         this.x = paramX;
         this.y = paramY;
-        this.opacity = 0.5
+        this.opacity = 0.5;
         this.radius = 2 + Math.random();
         this.rgb = rgb;
     };
@@ -310,7 +304,6 @@ var doodle = (function() {
 
     var stage;
     var init = function(jet_img_src) {
-
         var canvas = document.createElement('canvas');
         canvas.id = "canvas_doodle";
         canvas.height = window.innerHeight || html.clientHeight;
@@ -327,22 +320,23 @@ var doodle = (function() {
         resources.jet_img.src = jet_img_src;
         resources.jet_img.onload = function() {
             stage.setup();
-            requestAnimationFrame(stage.frame.bind(stage))
-        }
-
+            requestAnimationFrame(stage.frame.bind(stage));
+        };
     };
 
     var destroy = function() {
-        stage.destroy();
+        if (stage) {
+            stage.destroy();
+        }
         setTimeout(function() {
-            document.body.removeChild(document.getElementById("canvas_doodle"));
+            var el = document.getElementById("canvas_doodle");
+            if (el) document.body.removeChild(el);
         }, 50);
-        delete stage;
-    }
+        stage = null;
+    };
 
     return {
-        "init":init,
-        "destroy":destroy
-    }
-
+        "init": init,
+        "destroy": destroy
+    };
 })();
