@@ -1,14 +1,16 @@
 var doodle = (function() {
     Function.prototype.bind = Function.prototype.bind || function(fixThis) {
-        var func = this
+        var func = this;
         return function() {
-            return func.apply(fixThis, arguments)
-        }
-    }
+            return func.apply(fixThis, arguments);
+        };
+    };
+
     var DEBUG = false;
     var _l = function(obj) {
-        DEBUG && console && console.log && console.log(obj)
-    }
+        DEBUG && console && console.log && console.log(obj);
+    };
+
     var html = document.documentElement;
     var requestAnimationFrame = window.requestAnimationFrame ||
         window.webkitRequestAnimationFrame ||
@@ -16,56 +18,47 @@ var doodle = (function() {
         function(func) {
             setTimeout(func, 17);
         };
-    var
-        PI_half = Math.PI / 2, resources = {};
 
+    var PI_half = Math.PI / 2,
+        resources = {};
 
     var Stage = function(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.objects = [];
-        this.restart_timeout = 800;
+        this.restart_timeout = 1000;
         this.paused = false;
         this.destroyed = false;
         return this;
     };
-
-    var fps = 0, now, lastUpdate = (new Date) * 1 - 1;
-
-    var fpsFilter = 50;
-    var set_fps = function() {
-        var thisFrameFPS = 1000 / ((now = new Date) - lastUpdate);
-        fps += (thisFrameFPS - fps) / fpsFilter;
-        lastUpdate = now;
-    }
-
 
     Stage.prototype.frame = function() {
         if (this.destroyed) {
             return;
         }
 
-        this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height)
+        this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
 
-        for (var i in this.objects) {
+        for (var i = this.objects.length - 1; i >= 0; i--) {
             if (this.objects[i].destroyed == true) {
-                this.objects.splice(i, 1)
+                this.objects.splice(i, 1);
             } else {
-                this.objects[i].tick(this.ctx)
+                this.objects[i].tick(this.ctx);
             }
         }
 
         if (this.objects.length == 0) {
-            var self = this
+            var self = this;
             setTimeout(function() {
-                _l("restarting in " + self.restart_timeout)
-                self.setup();
-                self.frame();
+                if (!self.destroyed) {
+                    _l("restarting in " + self.restart_timeout);
+                    self.setup();
+                    self.frame();
+                }
             }, this.restart_timeout);
         } else if (!this.paused) {
-            requestAnimationFrame(this.frame.bind(this))
+            requestAnimationFrame(this.frame.bind(this));
         }
-
     };
 
     Stage.prototype.setup = function() {
@@ -75,7 +68,7 @@ var doodle = (function() {
     Stage.prototype.destroy = function() {
         this.destroyed = true;
         this.objects = [];
-    }
+    };
 
     var Formation = function(x, y) {
         this.x = x;
@@ -84,25 +77,25 @@ var doodle = (function() {
     };
 
     Formation.prototype.addPlane = function(formation_x, formation_y, color) {
-        var plane_x = this.x + formation_x, plane_y = this.y + formation_y;
+        var plane_x = this.x + formation_x;
+        var plane_y = this.y + formation_y;
         var plane = new JetPlane(resources.jet_img, plane_x, plane_y, color, formation_x, formation_y);
         this.planes.push(plane);
         return plane;
     };
 
-    Formation.prototype.travelTo = function(x, y, v) {
+    Formation.prototype.travelTo = function(endX, endY, v) {
         var f_plane;
         for (var i in this.planes) {
             f_plane = this.planes[i];
-            f_plane.travelTo(f_plane.formation_x + x, f_plane.formation_y + y, v)
+            f_plane.travelTo(f_plane.formation_x + endX, f_plane.formation_y + endY, v);
         }
     };
 
     Formation.prototype.tick = function(ctx) {
-
-        for (var i in this.planes) {
+        for (var i = this.planes.length - 1; i >= 0; i--) {
             if (this.planes[i].destroyed) {
-                _l("deleting plane " + i)
+                _l("deleting plane " + i);
                 this.planes.splice(i, 1);
             } else {
                 this.planes[i].tick(ctx);
@@ -118,62 +111,59 @@ var doodle = (function() {
         this.destroyed = true;
     };
 
+    // বাম -> ডান এবং ওপর -> নিচে মসৃণভাবে যাওয়ার জন্য প্যাটার্ন
     var getRandomFormation = function(stage) {
-        var canvasWidth = stage.ctx.canvas.width;
-        var canvasHeight = stage.ctx.canvas.height;
+        var w = stage.ctx.canvas.width;
+        var h = stage.ctx.canvas.height;
+        var margin = 80;
 
-        // বিভিন্ন দিক থেকে প্লেন আসার জন্য র‍্যান্ডম রুট প্যাটার্ন (০ থেকে ৩ পর্যন্ত ৪টি ডিরেকশন)
-        var directionType = Math.floor(Math.random() * 4);
-        var init_x, init_y, target_x, target_y;
+        var init_x, init_y, end_x, end_y;
 
-        if (directionType === 0) {
-            // ১. বাম দিক থেকে ডান দিকে
-            init_x = -100;
-            init_y = Math.random() * (canvasHeight * 0.7) + (canvasHeight * 0.15);
-            target_x = canvasWidth + 200;
-            target_y = init_y + (Math.random() * 200 - 100);
-        } else if (directionType === 1) {
-            // ২. ডান দিক থেকে বাম দিকে
-            init_x = canvasWidth + 100;
-            init_y = Math.random() * (canvasHeight * 0.7) + (canvasHeight * 0.15);
-            target_x = -200;
-            target_y = init_y + (Math.random() * 200 - 100);
-        } else if (directionType === 2) {
-            // ৩. নিচ থেকে ওপরের দিকে
-            init_x = Math.random() * (canvasWidth * 0.7) + (canvasWidth * 0.15);
-            init_y = canvasHeight + 100;
-            target_x = init_x + (Math.random() * 200 - 100);
-            target_y = -200;
+        // 0: বাম থেকে ডানে | 1: ওপর থেকে নিচে | 2: বাম-ওপর থেকে ডান-নিচে
+        var mode = Math.floor(Math.random() * 3);
+
+        if (mode === 0) {
+            // Left -> Right
+            init_x = -margin;
+            init_y = 80 + Math.random() * Math.max(100, h - 160);
+            end_x = w + margin;
+            end_y = init_y + (Math.random() * 140 - 70);
+        } else if (mode === 1) {
+            // Top -> Bottom
+            init_x = 80 + Math.random() * Math.max(100, w - 160);
+            init_y = -margin;
+            end_x = init_x + (Math.random() * 140 - 70);
+            end_y = h + margin;
         } else {
-            // ৪. কোণাকুণি (উপরের বাম কোণ থেকে নিচের ডান কোণ)
-            init_x = -100;
-            init_y = -100;
-            target_x = canvasWidth + 200;
-            target_y = canvasHeight + 200;
+            // Top-Left -> Bottom-Right
+            init_x = -margin;
+            init_y = 40 + Math.random() * (h * 0.45);
+            end_x = w + margin;
+            end_y = h * 0.55 + Math.random() * (h * 0.4);
         }
 
-        _l("starting from:" + init_x + " ," + init_y);
+        _l("mode: " + mode + " | from: (" + init_x + "," + init_y + ") to (" + end_x + "," + end_y + ")");
+
         var formation = new Formation(init_x, init_y);
 
-        formation.addPlane(0, -0, "0, 128, 0");
-        formation.addPlane(20, -30, "0, 128, 0");
-        formation.addPlane(40, -60, "255, 0, 0");
-        formation.addPlane(60, -60, "255, 0, 0");
-        formation.addPlane(80, -30, "0, 128, 0");
-        formation.addPlane(100, 0, "0, 128, 0");
+        formation.addPlane(0, 0, "0, 128, 0");
+        formation.addPlane(15, -25, "0, 128, 0");
+        formation.addPlane(30, -50, "255, 0, 0");
+        formation.addPlane(45, -50, "255, 0, 0");
+        formation.addPlane(60, -25, "0, 128, 0");
+        formation.addPlane(75, 0, "0, 128, 0");
 
-        var dx = target_x - init_x;
-        var dy = target_y - init_y;
-        formation.travelTo(dx, dy, 3.5 + 2 * Math.random());
+        var speed = 3 + 2.5 * Math.random();
+        formation.travelTo(end_x, end_y, speed);
         return formation;
     };
 
     var JetPlane = function(img, initX, initY, smoke_rgb, formation_x, formation_y) {
-        this.img = img
+        this.img = img;
         this.x = initX;
         this.y = initY;
         this.formation_x = formation_x;
-        this.formation_y = formation_y
+        this.formation_y = formation_y;
         this.smoke_particles_list = [];
         this.smoke_rgb = smoke_rgb;
         this.destroy_plane = false;
@@ -181,140 +171,129 @@ var doodle = (function() {
         return this;
     };
 
-    JetPlane.prototype.draw = function (ctx) {
+    JetPlane.prototype.draw = function(ctx) {
         ctx.save();
-        var angle = Math.atan2(this.pather.delta_y, this.pather.delta_x) + PI_half;
+        var angle = this.pather.angle + PI_half;
         ctx.translate(this.x, this.y);
-        ctx.rotate(angle)
+        ctx.rotate(angle);
 
-        ctx.drawImage(this.img, 0, 0);
+        // প্লেনের সেন্টার থেকে আঁকলে ঘোরার সময় ছিটকে যায় না
+        var drawW = this.img.width || 32;
+        var drawH = this.img.height || 32;
+        ctx.drawImage(this.img, -drawW / 2, -drawH / 2);
         ctx.restore();
 
-        for (var i in this.smoke_particles_list) {
+        for (var i = this.smoke_particles_list.length - 1; i >= 0; i--) {
             if (this.smoke_particles_list[i].destroyed == true) {
                 this.smoke_particles_list.splice(i, 1);
             } else {
                 this.smoke_particles_list[i].draw(ctx);
             }
         }
-
-    }
+    };
 
     JetPlane.prototype.travelTo = function(_x, _y, v) {
-        this.pather.createPath(this.x, this.y, this.x + _x, this.y + _y, v);
-    }
+        this.pather.createPath(this.x, this.y, _x, _y, v);
+    };
 
     JetPlane.prototype.tick = function(ctx) {
         this.pather.move();
-        var angle = Math.atan2(this.pather.delta_y, this.pather.delta_x) + PI_half;
-        var adj_x = - this.formation_x + this.formation_x * Math.cos(angle) - this.formation_y * Math.sin(angle);
-        var adj_y = - this.formation_y + this.formation_x * Math.sin(angle) + this.formation_y * Math.cos(angle);
+
+        var angle = this.pather.angle + PI_half;
+        var adj_x = -this.formation_x + this.formation_x * Math.cos(angle) - this.formation_y * Math.sin(angle);
+        var adj_y = -this.formation_y + this.formation_x * Math.sin(angle) + this.formation_y * Math.cos(angle);
+
         this.x = this.pather.x + adj_x;
         this.y = this.pather.y + adj_y;
-        
+
         if (this.smoke_particles_list.length < 100 && !this.destroy_plane) {
-            var delta_x = (11 + 2 * Math.random()) * Math.cos(angle) - (29 + 4 * Math.random()) * Math.sin(angle);
-            var delta_y = (11 + 2 * Math.random()) * Math.sin(angle) + (29 + 4 * Math.random()) * Math.cos(angle);
-            var smoke_particle = new SmokeParticle(this.x + delta_x, this.y + delta_y, this.smoke_rgb)
+            var delta_x = -Math.cos(this.pather.angle) * 18 + (Math.random() * 4 - 2);
+            var delta_y = -Math.sin(this.pather.angle) * 18 + (Math.random() * 4 - 2);
+            var smoke_particle = new SmokeParticle(this.x + delta_x, this.y + delta_y, this.smoke_rgb);
             this.smoke_particles_list.push(smoke_particle);
         }
+
         this.draw(ctx);
 
-        var bbw = 250; // bounding box width expanded for safe screen clearing
-        if (this.x > ctx.canvas.width + bbw || this.y > ctx.canvas.height + bbw || this.x < 0 - bbw || this.y < 0 - bbw) {
+        var bbw = 140;
+        if (
+            this.x > ctx.canvas.width + bbw ||
+            this.y > ctx.canvas.height + bbw ||
+            this.x < -bbw ||
+            this.y < -bbw
+        ) {
             this.destroy_plane = true;
         } else {
             this.destroy_plane = false;
         }
 
         if (this.destroy_plane && this.smoke_particles_list.length == 0) {
-            this.destroy()
+            this.destroy();
         }
-
     };
 
     JetPlane.prototype.destroy = function() {
         this.destroyed = true;
-    }
-
+    };
 
     var PathMaker = function() {
         this.speed = 2.5;
+        this.angle = 0;
         this.x = 0;
         this.y = 0;
         this.delta_x = 0;
         this.delta_y = 0;
-        this.distance = 0;
-        this.traveled = 0;
-        this.x1 = 0;
-        this.y1 = 0;
-        this.x2 = 0;
-        this.y2 = 0;
     };
 
     PathMaker.prototype.createPath = function(x1, y1, x2, y2, v) {
-        this.x1 = x1;
-        this.y1 = y1;
-        this.x2 = x2;
-        this.y2 = y2;
         this.x = x1;
         this.y = y1;
         this.delta_x = x2 - x1;
         this.delta_y = y2 - y1;
-        this.distance = Math.sqrt(this.delta_x * this.delta_x + this.delta_y * this.delta_y);
+        this.angle = Math.atan2(this.delta_y, this.delta_x);
         this.speed = v;
-        this.traveled = 0;
-    }
+    };
 
-    PathMaker.prototype.setSpeed = function (v) {
+    PathMaker.prototype.setSpeed = function(v) {
         this.speed = v;
-    }
+    };
 
-    PathMaker.prototype.move = function () {
-        if (this.distance > 0) {
-            this.traveled += this.speed;
-            var ratio = this.traveled / this.distance;
-            if (ratio > 1) ratio = 1;
-            this.x = this.x1 + this.delta_x * ratio;
-            this.y = this.y1 + this.delta_y * ratio;
-        }
-    }
+    PathMaker.prototype.move = function() {
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+    };
 
-
-    var SmokeParticle = function (paramX, paramY, rgb) {
+    var SmokeParticle = function(paramX, paramY, rgb) {
         this.x = paramX;
         this.y = paramY;
-        this.opacity = 0.5
+        this.opacity = 0.5;
         this.radius = 2 + Math.random();
         this.rgb = rgb;
     };
 
     SmokeParticle.prototype.draw = function(ctx) {
         ctx.save();
-
         ctx.beginPath();
         ctx.fillStyle = 'rgba(' + this.rgb + ',' + this.opacity + ')';
         ctx.shadowColor = 'rgba(' + this.rgb + ',1)';
-
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, true);
         ctx.fill();
 
-        this.radius = this.radius + 0.05;
-        this.opacity = this.opacity - 0.005;
+        this.radius += 0.05;
+        this.opacity -= 0.005;
         if (this.opacity <= 0) {
             this.destroyed = true;
         }
-
         ctx.restore();
     };
 
     var stage;
     var init = function(jet_img_src) {
-
         var canvas = document.createElement('canvas');
         canvas.id = "canvas_doodle";
         canvas.height = window.innerHeight || html.clientHeight;
         canvas.width = window.innerWidth || html.clientWidth;
+
         var canvasStyle = canvas.style;
         canvasStyle.position = 'fixed';
         canvasStyle.top = 0;
@@ -322,27 +301,37 @@ var doodle = (function() {
         canvasStyle.zIndex = 1138;
         canvasStyle['pointerEvents'] = 'none';
         document.body.appendChild(canvas);
+
+        window.addEventListener('resize', function() {
+            if (stage && stage.canvas) {
+                stage.canvas.width = window.innerWidth || html.clientWidth;
+                stage.canvas.height = window.innerHeight || html.clientHeight;
+            }
+        });
+
         stage = new Stage(canvas);
         resources.jet_img = new Image();
         resources.jet_img.src = jet_img_src;
         resources.jet_img.onload = function() {
             stage.setup();
-            requestAnimationFrame(stage.frame.bind(stage))
-        }
-
+            requestAnimationFrame(stage.frame.bind(stage));
+        };
     };
 
     var destroy = function() {
+        if (!stage) return;
         stage.destroy();
         setTimeout(function() {
-            document.body.removeChild(document.getElementById("canvas_doodle"));
+            var el = document.getElementById("canvas_doodle");
+            if (el && el.parentNode) {
+                el.parentNode.removeChild(el);
+            }
         }, 50);
-        delete stage;
-    }
+        stage = null;
+    };
 
     return {
-        "init":init,
-        "destroy":destroy
-    }
-
+        "init": init,
+        "destroy": destroy
+    };
 })();
